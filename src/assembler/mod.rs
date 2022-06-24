@@ -7,7 +7,7 @@ use nom::IResult;
 use std::collections::HashMap;
 use std::io::{Read, Write};
 
-type AssembleResult = Result<(), String>;
+pub type AssembleResult = Result<(), String>;
 
 /// Translate 6502 assembly into machine code.
 ///

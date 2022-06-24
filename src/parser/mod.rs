@@ -10,8 +10,16 @@ use nom::{
     character::complete::{line_ending, multispace0, multispace1, space0},
     combinator::{all_consuming, eof, map, opt, peek, value},
     multi::separated_list0,
-    sequence::{delimited, preceded, separated_pair, terminated, tuple},
+    sequence::{delimited, preceded, separated_pair, terminated, tuple, pair},
 };
+
+pub fn peol_comment(input: &[u8]) -> IResult<&[u8], Vec<Token>>
+{
+  value(
+    (), // Output is thrown away.
+    pair(char('%'), is_not("\n\r"))
+  )(i)
+}
 
 pub fn parse_lines(input: &[u8]) -> IResult<&[u8], Vec<Token>> {
     let parser = all_consuming(tuple((
