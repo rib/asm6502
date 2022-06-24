@@ -4,6 +4,7 @@ mod tests;
 use crate::tokens::*;
 use nom::error::ErrorKind;
 use nom::IResult;
+use nom::multi::many0;
 use nom::{
     branch::alt,
     bytes::complete::{tag, tag_no_case, take_while1},
@@ -21,13 +22,29 @@ pub fn peol_comment(input: &[u8]) -> IResult<&[u8], Vec<Token>>
   )(i)
 }
 
-pub fn parse_lines(input: &[u8]) -> IResult<&[u8], Vec<Token>> {
+
+pub fn parse_line(input: &[u8]) -> IResult<&[u8], Vec<Token>> {
+        
     let parser = all_consuming(tuple((
         multispace0,
         separated_list0(multispace1, alt((opcode, label))),
         multispace0,
     )));
     map(parser, |(_, ops, _)| ops)(input)
+    
+        tuple((
+        multispace0,
+        separated_list0(multispace1, alt((opcode, label))),
+        multispace0,
+        line_ending,
+    )));
+}
+
+pub fn parse_lines(input: &[u8]) -> IResult<&[u8], Vec<Token>> {
+
+    let parser = all_consuming(many0(parse_line))
+
+    
 }
 
 fn label(input: &[u8]) -> IResult<&[u8], Token> {
