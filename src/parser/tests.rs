@@ -17,20 +17,20 @@ macro_rules! assert_parse {
 
 macro_rules! assert_am_parse {
     ( $ input : expr , $ expected : expr ) => {
-        let result = addressing_mode($input.as_bytes());
+        let result = addressing_mode($input);
         assert_parse!($expected, result);
     };
 }
 
 macro_rules! assert_opcode_parse {
     ( $ input : expr , $ expected : expr ) => {
-        assert_parse!($expected, opcode($input.as_bytes()));
+        assert_parse!($expected, instruction($input));
     };
 }
 
 macro_rules! assert_mnemonic_parse {
     ( $ input : expr , $ expected : expr ) => {
-        let result = mnemonic($input.as_bytes());
+        let result = mnemonic($input);
         assert_parse!($expected, result);
     };
 }
@@ -116,7 +116,7 @@ fn parse_immediate_hex() {
     assert_am_parse!("#$1", AddressingMode::Immediate(0x1, Sign::Implied));
     assert_am_parse!("#$10", AddressingMode::Immediate(0x10, Sign::Implied));
     assert_am_parse!("#$ff", AddressingMode::Immediate(0xff, Sign::Implied));
-    assert_parse_fail!(addressing_mode(" #$100".as_bytes()));
+    assert_parse_fail!(all_consuming(addressing_mode)("#$100"));
 }
 
 #[test]
@@ -125,7 +125,7 @@ fn parse_immediate_dec() {
     assert_am_parse!("#10", AddressingMode::Immediate(10, Sign::Implied));
     assert_am_parse!("#255", AddressingMode::Immediate(255, Sign::Implied));
     assert_am_parse!("#-10", AddressingMode::Immediate(10, Sign::Negative));
-    assert_parse_fail!(addressing_mode(" #256".as_bytes()));
+    assert_parse_fail!(all_consuming(addressing_mode)("#256"));
 }
 
 #[test]
@@ -285,7 +285,7 @@ fn parse_opcode() {
 
 #[test]
 fn parse_lines() {
-    match super::parse_lines("ADC #1\nSBC $FFFF\nJMP ($ff00)\n".as_bytes()) {
+    match super::parse_lines("ADC #1\nSBC $FFFF\nJMP ($ff00)\n") {
         IResult::Ok((_, opcodes)) => {
             assert_eq!(3, opcodes.len());
             assert_eq!(
@@ -310,78 +310,68 @@ fn parse_lines() {
 
 #[test]
 fn several_implied_ops() {
-    let parsed = super::parse_lines("NOP\nNOP\nBRK".as_bytes());
+    let parsed = super::parse_lines("NOP\nNOP\nBRK");
     let expected = vec![
         Token::OpCode(OpCode(Mnemonic::Nop, AddressingMode::Implied)),
         Token::OpCode(OpCode(Mnemonic::Nop, AddressingMode::Implied)),
         Token::OpCode(OpCode(Mnemonic::Brk, AddressingMode::Implied)),
     ];
-    assert_eq!(parsed, Ok((&[] as &[u8], expected)));
+    assert_eq!(parsed, Ok(("", expected)));
 }
 
 #[test]
 fn empty_lines_in_front() {
-    let parsed = super::parse_lines("\n   \nNOP\nBRK".as_bytes());
+    let parsed = super::parse_lines("\n   \nNOP\nBRK");
     let expected = vec![
         Token::OpCode(OpCode(Mnemonic::Nop, AddressingMode::Implied)),
         Token::OpCode(OpCode(Mnemonic::Brk, AddressingMode::Implied)),
     ];
-    assert_eq!(parsed, Ok((&[] as &[u8], expected)));
+    assert_eq!(parsed, Ok(("", expected)));
 }
 
 #[test]
 fn empty_lines_in_middle() {
-    let parsed = super::parse_lines("NOP\n    \nBRK".as_bytes());
+    let parsed = super::parse_lines("NOP\n    \nBRK");
     let expected = vec![
         Token::OpCode(OpCode(Mnemonic::Nop, AddressingMode::Implied)),
         Token::OpCode(OpCode(Mnemonic::Brk, AddressingMode::Implied)),
     ];
-    assert_eq!(parsed, Ok((&[] as &[u8], expected)));
+    assert_eq!(parsed, Ok(("", expected)));
 }
 
 #[test]
 fn empty_lines_in_end() {
-    let parsed = super::parse_lines("NOP\nBRK  \n\n".as_bytes());
+    let parsed = super::parse_lines("NOP\nBRK  \n\n");
     let expected = vec![
         Token::OpCode(OpCode(Mnemonic::Nop, AddressingMode::Implied)),
         Token::OpCode(OpCode(Mnemonic::Brk, AddressingMode::Implied)),
     ];
-    assert_eq!(parsed, Ok((&[] as &[u8], expected)));
+    assert_eq!(parsed, Ok(("", expected)));
 }
 
 #[test]
 fn parsing_line_with_error() {
-    let parsed = super::parse_lines("LDX #ab".as_bytes());
+    let parsed = super::parse_lines("LDX #ab");
     assert!(parsed.is_err());
 }
 
 #[test]
 fn single_label() {
-    let parsed = super::parse_lines("label:".as_bytes());
+    let parsed = super::parse_lines("label:");
     assert_eq!(
         parsed,
-        Ok((&[] as &[u8], vec![Token::Label("label".to_string())]))
-    );
-    assert!(parsed.is_ok());
-}
-
-#[test]
-fn single_label_no_colon() {
-    let parsed = super::parse_lines("label".as_bytes());
-    assert_eq!(
-        parsed,
-        Ok((&[] as &[u8], vec![Token::Label("label".to_string())]))
+        Ok(("", vec![Token::Label("label".to_string())]))
     );
     assert!(parsed.is_ok());
 }
 
 #[test]
 fn label_in_context() {
-    let parsed = super::parse_lines("DEX\nlabel:\nDEX".as_bytes());
+    let parsed = super::parse_lines("DEX\nlabel:\nDEX");
     assert_eq!(
         parsed,
         Ok((
-            &[] as &[u8],
+            "",
             vec![
                 Token::OpCode(OpCode(Mnemonic::Dex, AddressingMode::Implied)),
                 Token::Label("label".to_string()),
@@ -392,27 +382,12 @@ fn label_in_context() {
 }
 
 #[test]
-fn label_no_colon_in_context() {
-    let parsed = super::parse_lines("DEX\nLabel\nDEX".as_bytes());
-    assert_eq!(
-        parsed,
-        Ok((
-            &[] as &[u8],
-            vec![
-                Token::OpCode(OpCode(Mnemonic::Dex, AddressingMode::Implied)),
-                Token::Label("Label".to_string()),
-                Token::OpCode(OpCode(Mnemonic::Dex, AddressingMode::Implied))
-            ]
-        ))
-    );
-}
-#[test]
 fn label_in_opcode() {
-    let parsed = super::parse_lines("BEQ LABEL".as_bytes());
+    let parsed = super::parse_lines("BEQ LABEL");
     assert_eq!(
         parsed,
         Ok((
-            &[] as &[u8],
+            "",
             vec![Token::OpCode(OpCode(
                 Mnemonic::Beq,
                 AddressingMode::Label("LABEL".to_string())
