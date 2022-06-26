@@ -58,10 +58,13 @@ fn process_tokens<'a, W: Write>(input: &'a str, tokens: Vec<Token>, output: &mut
 
     // Contains list of places there we should insert concrete address instead of label.
     let mut relocation_table: Vec<Relocation> = vec![];
-    let mut label_pos: HashMap<String, usize> = HashMap::new();
+    let mut label_pos: HashMap<String, u16> = HashMap::new();
     let mut codegen = Vec::<u8>::new();
 
+    let mut offset: u16 = 0;
+
     for token in tokens {
+        let len0 = codegen.len();
         match token {
             Token::OpCode(OpCode(mnemonic, am)) => {
                 if let AddressingMode::Label(label) = &am {
@@ -73,7 +76,7 @@ fn process_tokens<'a, W: Write>(input: &'a str, tokens: Vec<Token>, output: &mut
                 process_opcode(input, mnemonic, am, &mut codegen)?;
             }
             Token::Label(name) => {
-                label_pos.insert(name, codegen.len());
+                label_pos.insert(name, offset);
             }
             Token::ControlCommand(cmd) => {
                 match cmd {
@@ -82,9 +85,15 @@ fn process_tokens<'a, W: Write>(input: &'a str, tokens: Vec<Token>, output: &mut
                             signed(input, abs, sign, &mut codegen)?;
                         }
                     }
+                    ControlCommand::Org(address) => {
+                        offset = address;
+                    }
                 }
             }
         }
+
+        let delta = codegen.len() - len0;
+        offset += delta as u16;
     }
 
     for relocation in relocation_table.into_iter() {

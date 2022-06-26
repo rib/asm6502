@@ -84,6 +84,7 @@ pub enum AddressingMode {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ControlCommand {
     Byte(Vec<(u8, Sign)>),
+    Org(u16),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]

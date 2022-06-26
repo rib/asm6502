@@ -59,9 +59,19 @@ fn byte_cmd(input: &str) -> Result<Token> {
     expression_sequence(rest)
 }
 
+fn org_cmd(input: &str) -> Result<Token> {
+    let (rest, _) = tag_no_case(".ORG")(input)?;
+    let (rest, _) = space1(rest)?;
+
+    let (rest, address) = parse_word_hex(rest)?;
+
+    Ok((rest, Token::ControlCommand(ControlCommand::Org(address))))
+}
+
 fn control_cmd(input: &str) -> Result<Token> {
     alt((
         byte_cmd,
+        org_cmd,
     ))(input)
 }
 
