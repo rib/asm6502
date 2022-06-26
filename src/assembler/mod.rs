@@ -312,6 +312,7 @@ fn jmp<'a, 'b, T: Write>(input: &'a str, am: AddressingMode, output: &'b mut T) 
     match am {
         AddressingMode::Absolute(addr) => memory_word(input, 0x4c, addr, output),
         AddressingMode::Indirect(addr) => memory_word(input, 0x6c, addr, output),
+        AddressingMode::Label(label) => memory_word(input, 0x4c, addr, output),
         _ => Err(AssembleError::ParseError(format!("Unexpected operand encountered for JMP: {:?}", am))),
     }
 }
@@ -527,6 +528,21 @@ fn implied<'a, 'b, T: Write>(
             "Unexpected operand encountered for {}: {:?}",
             mnemonic, am
         )))
+    }
+}
+
+#[inline]
+fn absolute<'a, 'b, T: Write>(
+    input: &'a str,
+    opcode: u8,
+    am: AddressingMode,
+    mnemonic: &'static str,
+    output: &'b mut T,
+) -> AssembleResult<'a> {
+    match am {
+        AddressingMode::Absolute(addr) => memory_word(input, 0x4c, addr, output),
+        AddressingMode::Label() => {
+        }
     }
 }
 
